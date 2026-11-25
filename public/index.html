@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Speech to Text · Live Transcription</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+Devanagari:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><span class="dot"></span> Speech&nbsp;to&nbsp;Text</div>
+    <nav>
+      <button class="tab active" data-view="live">Live</button>
+      <button class="tab" data-view="history">History</button>
+    </nav>
+    <span id="health" class="pill">checking…</span>
+  </header>
+
+  <main>
+    <!-- LIVE VIEW -->
+    <section id="view-live" class="view active">
+      <div class="card recorder">
+        <div class="controls">
+          <label>Language
+            <select id="lang">
+              <option value="auto">Auto-detect (multilingual)</option>
+              <option value="hi-en">Hindi + English (Hinglish)</option>
+              <option value="en">English (India)</option>
+              <option value="hi">Hindi</option>
+            </select>
+          </label>
+          <span id="timer" class="timer">00:00</span>
+        </div>
+
+        <button id="mic" class="mic" aria-label="Start recording">
+          <svg viewBox="0 0 24 24" width="34" height="34" fill="currentColor"><path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 1 0-6 0v6a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11h-2z"/></svg>
+          <span class="ring" id="ring"></span>
+        </button>
+        <p id="status" class="status">Tap the mic and start speaking</p>
+
+        <div id="transcript" class="transcript" contenteditable="false" aria-live="polite">
+          <span class="placeholder">Your words will appear here in real time…</span>
+        </div>
+
+        <div class="actions">
+          <input id="title" placeholder="Title (optional)" maxlength="200" />
+          <button id="speak" class="btn ghost" disabled>🔊 Read aloud</button>
+          <button id="clear" class="btn ghost" disabled>Clear</button>
+          <button id="save" class="btn primary" disabled>Save transcription</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- HISTORY VIEW -->
+    <section id="view-history" class="view">
+      <div class="card">
+        <div class="history-head">
+          <h2>Transcription history <small id="count"></small></h2>
+          <div class="history-tools">
+            <input id="search" type="search" placeholder="Search title or text…" />
+            <button id="new" class="btn primary">+ New</button>
+          </div>
+        </div>
+        <div id="list" class="list"></div>
+        <div class="pager">
+          <button id="prev" class="btn ghost">‹ Prev</button>
+          <span id="page"></span>
+          <button id="next" class="btn ghost">Next ›</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <dialog id="editor">
+    <form method="dialog" id="editForm">
+      <h3 id="editHeading">Edit transcription</h3>
+      <label>Title <input name="title" maxlength="200" /></label>
+      <label>Language
+        <select name="language">
+          <option value="auto">auto</option><option value="hi-en">hi-en</option>
+          <option value="en">en</option><option value="hi">hi</option>
+        </select>
+      </label>
+      <label>Text <textarea name="content" rows="8" required></textarea></label>
+      <div class="actions">
+        <button value="cancel" class="btn ghost" formnovalidate>Cancel</button>
+        <button value="save" class="btn primary">Save</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div id="toast" class="toast"></div>
+  <script src="app.js"></script>
+</body>
+</html>
