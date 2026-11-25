@@ -1,5 +1,7 @@
 # 🎙️ Speech to Text: Real-time Multilingual Transcription
 
+**🔗 Live demo:** https://stt.dexploit.space
+
 A web app that transcribes speech **live as you talk**, including **code-mixed Hindi + English (Hinglish)**. Every transcription is stored in **PostgreSQL**, and a **history dashboard** supports full CRUD (create, read, update, delete) plus search and pagination.
 
 Built for the Procucev AI tech hiring assignment.
