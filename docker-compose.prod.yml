@@ -1,0 +1,36 @@
+# Production: pulls the prebuilt image from GHCR (no build on the server).
+# Tuned for small instances (~512 MB RAM).
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    command: ["postgres", "-c", "shared_buffers=32MB", "-c", "max_connections=20", "-c", "work_mem=2MB"]
+    environment:
+      POSTGRES_USER: stt
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: stt
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U stt"]
+      interval: 10s
+      retries: 10
+    mem_limit: 128m
+
+  app:
+    image: ghcr.io/m-afnan2018/speech-to-text-live:latest
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://stt:${POSTGRES_PASSWORD}@db:5432/stt
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.5-transcribe-live}
+      NODE_OPTIONS: --max-old-space-size=128
+    ports:
+      - "127.0.0.1:${APP_PORT:-3000}:3000"
+    mem_limit: 192m
+
+volumes:
+  pgdata:

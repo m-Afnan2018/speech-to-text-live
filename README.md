@@ -57,6 +57,16 @@ cp .env.example .env          # then add your GEMINI_API_KEY (https://aistudio.g
 docker compose up -d --build  # app on http://localhost:3110
 ```
 
+### Production (prebuilt image)
+Every push to `main` builds the image with GitHub Actions and publishes it to
+`ghcr.io/m-afnan2018/speech-to-text-live`. On the server you only pull it:
+
+```bash
+curl -O https://raw.githubusercontent.com/m-Afnan2018/speech-to-text-live/main/docker-compose.prod.yml
+# create .env with GEMINI_API_KEY and POSTGRES_PASSWORD
+docker compose -f docker-compose.prod.yml up -d
+```
+
 Without Docker: start PostgreSQL, set `DATABASE_URL` in `.env`, then run `npm install && npm start`.
 
 > The microphone needs a secure context: use `localhost` or HTTPS.
