@@ -37,12 +37,59 @@ function attachLiveProxy(server) {
     const pending = [];
     let closeTimer = null;
 
+    // --- Server-side voice activity detection -------------------------------
+    // Gemini's built-in VAD proved unreliable for some voices/mics, so we mark
+    // utterance boundaries ourselves: activityStart when speech energy appears,
+    // activityEnd after a short silence. Each activityEnd yields a final segment;
+    // interim results stream while the user is speaking.
+    const VAD = { threshold: 0.012, hangoverMs: 700, maxUtteranceMs: 20000, prerollFrames: 3 };
+    let speaking = false;
+    let silenceMs = 0;
+    let utteranceMs = 0;
+    const preroll = [];
+
+    const sendUp = (obj) => {
+      const s = JSON.stringify(obj);
+      if (ready && upstream.readyState === WebSocket.OPEN) upstream.send(s);
+      else if (pending.length < 100) pending.push(s);
+    };
+    const audioMsg = (buf) => ({ realtimeInput: { audio: { data: buf.toString('base64'), mimeType: 'audio/pcm;rate=16000' } } });
+    const endActivity = () => {
+      if (!speaking) return;
+      speaking = false;
+      sendUp({ realtimeInput: { activityEnd: {} } });
+    };
+
+    function onAudio(buf) {
+      const samples = new Int16Array(buf.buffer, buf.byteOffset, Math.floor(buf.length / 2));
+      let sum = 0;
+      for (let i = 0; i < samples.length; i++) sum += (samples[i] / 32768) ** 2;
+      const rms = Math.sqrt(sum / (samples.length || 1));
+      const frameMs = (samples.length / 16000) * 1000;
+      const voiced = rms > VAD.threshold;
+
+      if (!speaking) {
+        preroll.push(buf);
+        if (preroll.length > VAD.prerollFrames) preroll.shift();
+        if (!voiced) return;
+        speaking = true; silenceMs = 0; utteranceMs = 0;
+        sendUp({ realtimeInput: { activityStart: {} } });
+        preroll.splice(0).forEach((b) => sendUp(audioMsg(b))); // includes current frame
+        return;
+      }
+      sendUp(audioMsg(buf));
+      utteranceMs += frameMs;
+      silenceMs = voiced ? 0 : silenceMs + frameMs;
+      if (silenceMs >= VAD.hangoverMs || utteranceMs >= VAD.maxUtteranceMs) endActivity();
+    }
+
     upstream.on('open', () => {
       upstream.send(JSON.stringify({
         setup: {
           model: `models/${model}`,
           generationConfig: { responseModalities: ['TEXT'] },
           inputAudioTranscription: { languageCodes: lang },
+          realtimeInputConfig: { automaticActivityDetection: { disabled: true } },
         },
       }));
     });
@@ -55,6 +102,10 @@ function attachLiveProxy(server) {
         send({ type: 'ready', model });
         pending.splice(0).forEach((m) => upstream.send(m));
         return;
+      }
+      if (msg.error) {
+        console.error('[gemini] error:', JSON.stringify(msg.error));
+        send({ type: 'error', message: msg.error.message || 'Transcription service error' });
       }
       const sc = msg.serverContent;
       if (sc?.interimInputTranscription?.text !== undefined) {
@@ -76,20 +127,13 @@ function attachLiveProxy(server) {
     });
 
     client.on('message', (data, isBinary) => {
-      if (isBinary) {
-        const frame = JSON.stringify({
-          realtimeInput: { audio: { data: Buffer.from(data).toString('base64'), mimeType: 'audio/pcm;rate=16000' } },
-        });
-        if (ready && upstream.readyState === WebSocket.OPEN) upstream.send(frame);
-        else if (pending.length < 50) pending.push(frame);
-        return;
-      }
+      if (isBinary) return onAudio(Buffer.from(data));
       let ctrl;
       try { ctrl = JSON.parse(data.toString()); } catch { return; }
       if (ctrl.type === 'stop' && upstream.readyState === WebSocket.OPEN) {
-        // Flush: ask Gemini to finalize the last utterance, then close shortly after.
-        upstream.send(JSON.stringify({ realtimeInput: { audioStreamEnd: true } }));
-        closeTimer = setTimeout(() => upstream.close(), 2500);
+        // Flush: finalize the in-progress utterance, then close shortly after.
+        endActivity();
+        closeTimer = setTimeout(() => upstream.close(), 3000);
       }
     });
 
